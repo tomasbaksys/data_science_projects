@@ -1,0 +1,441 @@
+---
+title: "Transformations and Interactions"
+author: "Tomas Baksys"
+date: '2025-02-24'
+output:
+  html_document:
+    toc: yes
+    theme: cerulean
+    toc_depth: 5
+  word_document:
+    toc: yes
+    toc_depth: '5'
+  pdf_document:
+    toc: yes
+    toc_depth: '5'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Set your working directory:
+
+```{r}
+setwd("C:/Users/2004t/OneDrive/3rd year/2nd semester/Econometric Methods and applications/Lecture 4/")
+
+
+```
+
+Before we begin, write a code chunk that loads the following packages:
+```{r lib, warning=FALSE, message=FALSE, error=FALSE}
+library(knitr)
+library(tidyverse)
+library(margins)
+library(forcats)
+library(MASS)
+library(stargazer)
+library(ggplot2)
+library(sjPlot)
+library(ggpubr)
+```
+
+Load the data (I merged several datasets, and additional column for count has emerged, which am eliminating using the following code):
+
+```{r}
+
+fulldata <- read.csv("EMA4.csv")[ ,2:13]
+fulldata
+
+```
+
+* Happiness is coded on a 0 to 10 scale where 10 represents the most satisfaction, is compiled from a meta-analysis of several studies that created the [\textcolor{blue}{Gross National Happiness}](http://en.wikipedia.org/wiki/Gross_National_Happiness) indices. In general, this index describes a combination of people's self-reported life satisfaction with other social, health, and economic indicators.
+
+* Happy-binary is coded as true if the happiness score is more than 4.5.
+
+* oilstate contains data from the CIA on whether each country exports enough oil to be classified as an "oil state", and on the predominant religion in the country.
+
+* Adult literacy rate (percentage of population age 15 or older) ("literacy")
+
+* Total population in millions ("population")
+
+* Median age in years ("medianage")
+
+* Gross domestic product (GDP) per capita in 2008 US dollars ("gdpcap")
+
+* Income inequality, measured with a GINI coefficient (higher values indicate more inequality) ("GINI")
+
+* A multidimensional poverty index (higher values indicate more poverty) ("povertyindex")
+
+* Region of the world the country is located in ("region")
+
+## Part 1: `ggplot` graphics
+For each of the following graphics, set the code chunk options so that the figure is centered, correctly proportioned (not stretched too wide or too long), and not too big or small. Make sure each graph has a descriptive title and that the axes have clear labels. I will help you with the first plots.
+
+### Question 1: Scatterplot
+Create a scatterplot with the poverty index on the x-axis and the happiness score on the y-axis.  Alter the color and shape of each point to represent the regions. 
+
+```{r, fig.align="center", fig.width=7, fig.height=5}
+ggplot(fulldata, aes(x=povertyindex, y=happiness, color = region, shape = region)) + 
+  geom_point(size=2) +
+  #geom_smooth(method = "lm", level = 0.95) +  
+  xlab("Poverty Rate") +
+  ylab("Happiness") +
+  ggtitle("Does Poverty Rate Indicate Lower Happiness?") +
+  theme_bw() 
+
+```
+
+### Question 2: Faceting
+Create four scatterplots, arranged in a grid, each one representing one region.  In each scatterplot, place the poverty index on the x-axis and the happiness score on the y-axis.  Allow the scales of the x and y axes to be different in each plot. Also include the line of best fit in each plot. Hint: `+facet_wrap(~ region, scales="free")` will help you get four scatterplots.
+
+```{r}
+ggplot(fulldata, aes(x=povertyindex, y=happiness)) + 
+  geom_point(size=2, color="blue") +
+  geom_smooth(method="lm", level=0.95, color="darkblue", fill="lightblue") +
+  xlab("Poverty Rate") +
+  ylab("Happiness score") +
+  ggtitle("Does poverty rate indicate lower happiness?") +
+  facet_wrap(~ region, scales = "free")+
+  theme_bw()
+
+
+```
+
+### Question 3: Bar plot
+
+Create a bar plot that represents the frequencies of each region.  Within each region, create two bars of two different colors, one representing the count of happy countries (from the binary version of the happiness variable from part 1, question 2e), and one representing the count of non-happy countries.  In other words, to the right there should be two bars for Africa, one for the count of non-happy countries in Africa and one for the count of happy countries, then a space, then the same two bars for Asia/Oceania, and so on. Add to the command `guides(fill=guide_legend(title="Happy country"))` to change the legend title to something nicer.
+
+```{r}
+ggplot(fulldata, aes(x = region, fill = happy_binary)) + 
+  geom_bar(position = "dodge")+
+  xlab("Region") +
+  ylab("Happiness Binary ") +
+  ggtitle("Are some regions more happy than others?") +
+  guides(fill=guide_legend(title="Happy country"))+
+  theme_bw()
+
+
+```
+
+### Question 4: Grouped Density
+
+Create a density plot for the GINI coefficient, which represents the amount of economic inequality in a country.  Draw two overlapping densities, one for oil-exporting states and one for non-oil-exporting states.  Use two different colors for the two oil-state groups, and make the colors somewhat transparent so that both densities can be seen clearly. [Hint: make a second data frame and remove the rows in which `oilstate` is missing.  Then plot from this second data frame.]
+
+```{r}
+
+data2 <- filter(fulldata, !is.na(oilstate)) 
+ggplot(data2, aes(x = GINI, color = oilstate, fill = oilstate))+
+  geom_density(alpha = 0.3)+
+  ggtitle("Do oilstates have higher income inequality on average?") +
+  theme_bw()
+
+
+```
+
+## Part 2: Linear regression without transformations
+
+### Question 1: Running a regression model
+Regress national happiness on the poverty index, region, oilstate, literacy, and median age.  Display the results.
+
+```{r}
+#summary(fulldata)
+print(sum(is.na(fulldata$happiness)))
+print(sum(is.na(fulldata$region)))
+print(sum(is.na(fulldata$povertyindex)))
+print(sum(is.na(fulldata$literacy)))
+df <- filter(fulldata, !is.na(oilstate) & !is.na(medianage) & !is.na(povertyindex) & !is.na(literacy))
+print(sum(is.na(df$medianage)))
+print(sum(is.na(df$oilstate)))
+print(sum(is.na(df$povertyindex)))
+print(sum(is.na(df$literacy)))
+```
+```{r}
+reg <- lm(happiness ~ povertyindex + region + oilstate + literacy,data = df)
+summary(reg)
+```
+### Question 2: Interpreting coefficients 
+
+Interpret the coefficients.
+Poverty has negative affect of -0.02 on happiness, while american region has really strong 1.19 effect on happiness compared to other regions, Europe and oilstates seem to have somewhat positive effect as well
+
+
+### Question 3: Changing the reference category 
+
+Rurun the regression in question 1, this time treating Americas as the reference group (use `mutate` and `fct_relevel` commands).  Provide a complete interpretation of the new coefficients for region, and without sacrificing accuracy or completeness, phrase the interpretations in a way that's not extremely technical.
+
+```{r changebase}
+new_df <- mutate(df, region = fct_relevel(region,
+                                                  "Americas", "Africa", "Asia/Oceania", "Europe")) # Decided to make your lives a little bit easier. Run a regression with transformed region variable:
+reg <- lm(happiness ~ povertyindex + region + oilstate + literacy,data = new_df)
+summary(reg)
+
+
+```
+
+* Countries in Africa, relative to countries in the Americas, ....
+
+* Countries in Asia or Oceania, relative to countries in the Americas, ... .
+
+* Countries in Europe, relative to countries in the Americas, ... .
+
+### Question 4: Confidence intervals
+
+This is just a neat way to extract the confidence interval. Display the 95% confidence intervals for the coefficients in the regression in problem 1.
+
+```{r confint}
+confint(reg)
+```
+
+### Question 5: p-value
+
+Interpret the p-value for the poverty index.  Be extremely specific and careful with this interpretation.
+
+
+## Part 3: Linear regression with transformations 
+
+### Question 1: Logging x 
+
+Regress happiness on GDP per capita, controlling for oil state, median age, and region. Take a logarithm --- in which you choose a base of 1.1 --- of GDP per capita. Provide an interpretation of the coefficient on logged GDP per capita.  Explain why a researcher would want to take the logarithm of GDP per capita (be as specific as possible).
+
+I use the logarithmic base 1.1 to interpret the coefficient as referring to a 10% increase in GDP per capita:
+```{r logx}
+ggplot(data = fulldata, aes(x = gdpcap))+
+  geom_histogram(bins = 10)
+
+fulldata$gdpcap_log <- logb(fulldata$gdpcap, base = 1.1)
+ggplot(data = fulldata, aes(x = gdpcap_log))+
+  geom_histogram(bins = 10)
+reg <- lm(happiness ~ gdpcap_log + oilstate + medianage + region,data = fulldata)
+summary(reg)
+```
+
+
+### Question 2: Logging x and y 
+
+Regress happiness on GDP per capita, controlling for oil state, median age, and region. Take a logarithm --- in which you choose an appropriate base --- of GDP per capita. This time, also take the NATURAL logarithm of happiness. Provide an interpretation of the coefficient on GDP per capita.  Explain why a researcher would want to take the logarithm of happiness (be as specific as possible).
+
+```{r logy}
+ggplot(data = fulldata, aes(x = happiness))+
+  geom_histogram(bins = 10)
+fulldata$happiness_log <- log(fulldata$happiness)
+ggplot(data = fulldata, aes(x = happiness_log))+
+  geom_histogram(bins = 10)
+reg <- lm(happiness_log ~ gdpcap_log + oilstate + medianage + region, data = fulldata)
+summary(reg)
+```
+
+To interpret this coefficient, we need to convert it to percent change in Y using the formula:
+```{r percenty}
+percent_change_Y <- (exp(0.008) - 1) * 100
+print(percent_change_Y) 
+```
+
+
+
+### Question 3: Continuous by continuous interation 
+
+Regress the happiness index on the interaction between poverty and literacy, controlling for oil state, region, and median age. Display the coefficients, then use the `margins()` function to display the **marginal effect of poverty on happiness, conditional on literacy**. Interpret the effect of poverty on happiness when the literacy rate is 60 and when the literacy rate is 90. Then plot all of the marginal effects along with the 95% confidence intervals of these effects.
+
+The regression is:
+```{r int1}
+reg <- lm(happiness ~ povertyindex*literacy + medianage + 
+                region + oilstate, data=fulldata)
+summary(reg)
+```
+The marginal effects are given by:
+```{r margins1, cache=TRUE}
+m <- margins(reg, at=list(literacy = seq(25, 100, by=5)))
+marg.sum <- summary(m)
+marg.sum <- filter(marg.sum, factor=="povertyindex")
+marg.sum
+```
+The interpretations are:
+
+* When the literacy rate is 60, a one point increase in poverty is associated with a 0.015 decrease in happiness, on average, controlling for whether a country exports oil, median age, and region.
+
+* When the literacy rate is 90, a one point increase in poverty is associated with a 0.031 decrease in happiness, on average, controlling for whether a country exports oil, median age, and region.
+
+The graph of all of these marginal effects is:
+```{r margplot1, fig.align="center", fig.width=8, fig.height=5}
+g <- ggplot(marg.sum, aes(x=literacy, y=AME)) +
+      geom_line() +
+      geom_ribbon(aes(ymin=lower, ymax=upper), alpha=.5) +
+      geom_hline(yintercept = 0, lty=2) +
+      xlab("Literacy rate") +
+      ylab("Average marginal effect") +
+      ggtitle("Marginal effect of poverty on happiness, conditional on literacy")
+g
+```
+
+### Question 4: Continuous by binary interation 
+
+Regress the happiness index on the interaction between poverty and oil state, controlling for literacy, region, and median age. Display the coefficients, then use the `margins()` function to display the **marginal effect of poverty on happiness, conditional on whether the country exports oil**. Interpret the effect of poverty on happiness for oil-exporting states and non-oil-exporting states. Then plot all of the marginal effects along with the 95% confidence intervals of these effects.
+
+The regression is:
+```{r int2}
+reg <- lm(happiness ~ povertyindex*oilstate + literacy + medianage + 
+                region, data=fulldata)
+summary(reg)
+```
+The marginal effects are given by:
+```{r margins2, cache=TRUE}
+m <- margins(reg, at=list(oilstate = c("non-oil-exporting", "oil-exporting")))
+marg.sum <- summary(m)
+marg.sum <- filter(marg.sum, factor=="povertyindex")
+marg.sum
+```
+The interpretations are:
+
+* For non-oil-exporting states, a one point increase in poverty is associated with a 0.018 decrease in happiness, on average, controlling for the literacy rate, median age, and region.
+
+* For oil-exporting states, a one point increase in poverty is associated with a 0.018 decrease in happiness, on average, controlling for the literacy rate, median age, and region.
+
+The graph of all of these marginal effects is:
+```{r margplot2, fig.align="center", fig.width=7, fig.height=5}
+g <- ggplot(marg.sum, aes(x=oilstate, y=AME, color=oilstate)) +
+      geom_point() +
+      geom_linerange(aes(ymin=lower, ymax=upper)) +
+      geom_hline(yintercept = 0, lty=2) +
+      xlab("Oil-exporting state?") +
+      ylab("Average marginal effect") +
+      ggtitle("Marginal effect of poverty on happiness, conditional on oil") +
+      guides(color=FALSE) +
+      coord_flip()
+g
+```
+
+### Question 5: Continuous by unordered categorical interation
+Regress the happiness index on the interaction between poverty and region, controlling for literacy, oil state, and median age. Display the coefficients, then use the `margins()` function to display the **marginal effect of poverty on happiness, conditional on the region the country resides in**. Interpret the effect of poverty on happiness for each region. Then plot all of the marginal effects along with the 95% confidence intervals of these effects.
+
+The regression is:
+```{r int3}
+reg <- lm(happiness ~ povertyindex*region + literacy + medianage + 
+                oilstate, data=fulldata)
+summary(reg)
+```
+The marginal effects are given by:
+```{r margins3, cache=TRUE}
+m <- margins(reg, at=list(region = c("Americas", "Africa", "Asia/Oceania", "Europe")))
+marg.sum <- summary(m)
+marg.sum <- filter(marg.sum, factor=="povertyindex")
+marg.sum
+```
+The interpretations are:
+
+* For American states, a one point increase in poverty is associated with a 0.054 decrease in happiness, on average, controlling for the literacy rate, median age, and whether the country exports oil.
+
+* For African states, a one point increase in poverty is associated with a 0.016 decrease in happiness, on average, controlling for the literacy rate, median age, and whether the country exports oil.
+
+* For Asia/Oceania states, a one point increase in poverty is associated with a 0.033 decrease in happiness, on average, controlling for the literacy rate, median age, and whether the country exports oil.
+
+* For Europe states, a one point increase in poverty is associated with a 0.013 increase in happiness, on average, controlling for the literacy rate, median age, and whether the country exports oil.
+
+The graph of all of these marginal effects is:
+```{r margplot3, fig.align="center", fig.width=7, fig.height=5}
+g <- ggplot(marg.sum, aes(x=region, y=AME, color=region)) +
+      geom_point() +
+      geom_linerange(aes(ymin=lower, ymax=upper)) +
+      geom_hline(yintercept = 0, lty=2) +
+      xlab("Region") +
+      ylab("Average marginal effect") +
+      ggtitle("Marginal effect of poverty on happiness, conditional on region") +
+      guides(color=FALSE) +
+      coord_flip()
+g
+```
+
+## Part 4. Binary Logit
+
+### Question 1. Run a binary logit, probit and c-log-log regressions.
+Run the logit, probit, and cloglog models on the data. Use the binary national happiness as your DV, the poverty index as your IV, and region, oilstate, literacy, and median age as you control variables.  The command for all three is the `glm()` function with the Bernoulli family, a special case of the binomial family, but with different link functions.  For logit, this argument is `family=binomial(link="logit")`.  For probit, the argument is `family=binomial(link="probit")`.  For c-log-log, the argument is `family=binomial(link="cloglog")`.  We run all three models as follows:
+
+
+```{r runmodels}
+fulldata <- na.omit(fulldata)
+
+logit <- glm(happy_binary ~ povertyindex + literacy + medianage + 
+                region + oilstate, data=fulldata, family=binomial(link="logit"))
+probit <- glm(happy_binary ~ povertyindex + literacy + medianage + 
+                region + oilstate, data=fulldata, family=binomial(link="probit"))
+cloglog <- glm(happy_binary ~ povertyindex + literacy + medianage + 
+                region + oilstate, data=fulldata, family=binomial(link="cloglog"))
+```
+
+### Question 2: Let's generate a nice *stargazer* table:
+
+We can use the `stargazer` package to create beautiful-looking coefficient tables for each of the models:
+
+```{r logittable, results="asis"}
+stargazer(logit, probit, cloglog, type="text", 
+          title="Who are Happy?", align = TRUE,
+          dep.var.labels = "Happy",
+          column.labels = c("Logit", "Probit", "Cloglog"),
+          model.names = FALSE)
+```
+
+Going off of sign and significance, all three models return the same results.  
+
+### Question 3. Odds ratios from the logit model
+
+As we discussed, there are several ways to understand the results of a GLM. Odds ratios --- available for logit, but not directly available for probit and cloglog --- are easy to calculate by exponentiating the logit coefficients, and are easier to interpret substantively.^[The `t.auto` and `p.auto` options must be set to `FALSE` when reporting odds ratios automatically, otherwise `stargazer()` will automatically recalculate t and p values, thinking the odds ratios are the coefficients.]
+
+```{r logittableodds, results="asis"}
+stargazer(logit, type="text", 
+          title="Who are Happy?", align = TRUE,
+          dep.var.labels = "Happy Model",
+          model.names = FALSE,
+          apply.coef = exp,
+          t.auto=FALSE, 
+          p.auto=FALSE)
+```
+Here are some interpretations:
+
+* A one unite increase in poverty index decreases the odds by 6% that an individual will be happy, on average, after taking literacy, median age, regions and oil wealth into account. 
+
+* A one unite increase in poverty index makes it 6% less likely that an individual will be happy, on average, after taking literacy, median age, regions and oil wealth into account. 
+
+* The odds for individuals in oil-exporting countries to be happy are 300% higher than the odds for individuals in non-oil-exporting states to be happy, on average, after taking literacy, median age, regions and oil wealth into account.
+
+Let's visualize the odds:
+
+```{r}
+
+png("my_plota.png", width = 800, height = 600)
+
+p <- plot_model(logit, vline.color = "blue", how.values = TRUE, value.offset = .3) + labs(title = "My ideal leader has a policy on equal opportunities among the employees")
+p
+
+dev.off()
+p
+```
+
+### Question 4: Calculate predicted probabilities and visualize the results
+Let's extract predicted probabilities using a `predict` function and calculate the mean for binary independent variable:
+
+```{r}
+fulldata$predicted_probs <- mean(predict(logit, type = "response")) # type = "link" returns log odds, whereas type = "response" returns predictions on the original scale -- that is, predicted probabilities
+```
+
+Next step is to visualize predicted probabilities using `ggplot`:
+
+```{r}
+g <- ggplot(fulldata, aes(x = oilstate, y = predicted_probs)) +
+  geom_point() +
+  geom_line() +
+  labs(title = "Predicted Probabilities vs Oil Exporting State", x = "Oil Exporter", y = "Predicted Probability")
+
+g
+```
+
+### Question 5. Let's plot the marginal effect for poverty and happiness conditioning on oil exports:
+
+```{r}
+library(effects)
+
+plot_model(logit, type = "eff", terms = c("povertyindex", "oilstate"))
+
+
+```
+
+
