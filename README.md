@@ -1,7 +1,7 @@
 # 📊 Data Science Portfolio  
 
-**Hi there, welcome!** 👋 I’m Tomas Bakšys, a student of Data Science, passionate about solving real-world problems with data.  
-This repository houses my projects, each demonstrating skills in machine learning, data analysis, and visualization.  
+**Hi there, welcome!** 👋 I’m Tomas Bakšys, a student of Economics and Data analytics at ISM University.  
+This private repository showaces 5 of my projects, mainly focusing in machine learning, data analysis, and visualization tasks.  
 
 ---
 
